@@ -41,7 +41,7 @@ Each agent invocation is a **fresh Claude Code subprocess** (no session history)
 Requires Python 3.10+, [Claude Code CLI](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) installed and authenticated, and an Anthropic subscription (the agents run through Claude Code, no API key needed in your environment).
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/paper-pipeline.git
+git clone https://github.com/TyrannosaurusR/Paper-pipeline.git
 cd paper-pipeline
 python -m venv .venv
 source .venv/bin/activate          # macOS / Linux
