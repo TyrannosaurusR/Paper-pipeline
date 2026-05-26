@@ -1,0 +1,17 @@
+# Orchestrator (run.py) 本身**不需要**任何外部套件，只用 Python stdlib。
+#
+# 以下是「Claude Code agents 在子程序中可能會用到」的套件 ——
+# 預先裝好，agents 透過 Bash tool 就能直接 import 而不用每次 pip install。
+#
+# 安裝方式：
+#   python -m venv .venv
+#   .venv\Scripts\Activate.ps1       # PowerShell
+#   pip install -r requirements.txt
+
+arxiv>=2.1.0
+semanticscholar>=0.7.0
+requests>=2.31.0
+
+# Google Scholar 反反爬蟲（可選）。安裝較重，需要 playwright browser。
+# 取消註解並執行：pip install scrapling && scrapling install
+# scrapling>=0.2.0

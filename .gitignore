@@ -1,0 +1,36 @@
+# Paper Pipeline — PUBLIC repo .gitignore
+# 此版本：EXCLUDE projects/*（除了 _template/）、EXCLUDE PDFs；只追蹤工具本身
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Env / Secrets ---
+.env
+.env.*
+!.env.example
+*.key
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Research projects: 只保留 _template，不公開任何具體研究 ---
+projects/*
+!projects/_template/
+!projects/.gitkeep
+
+# --- PDFs（無論如何不公開） ---
+*.pdf
+
+# --- Runtime artifacts ---
+logs/
+*.log
+projects/*/search_papers*.py
