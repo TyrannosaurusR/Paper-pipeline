@@ -1,124 +1,136 @@
 # Paper Pipeline
 
-An automated literature review pipeline that uses [Claude Code CLI](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) as the agent runtime. Four specialized agents — Paper Finder, Grad Student, TA, Professor — collaborate to find papers, extract key points, write teaching-friendly analyses, and produce a peer-reviewed literature review for any given research question.
+一個自動化的文獻整理系統，使用 [Claude Code CLI](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) 作為 agent runtime。四個專業 agent —— Paper Finder、Grad Student、TA、Professor —— 分工合作找 paper、抽 key points、寫教學文、產出經過審查的 literature review。
 
-## Why this exists
+## 為什麼建這個
 
-Most LLM-based literature review tools either dump synthesized prose with no source traceability or read papers one at a time without cross-paper context. This pipeline separates concerns into distinct agents, each with a single responsibility, communicating only through files in the project folder. Every state transition is observable (you can read the intermediate files), every step is restartable, and the revision loop between Grad Student and Professor mirrors how real academic peer review works.
+目前 LLM 輔助文獻 review 工具的兩種典型問題：
+1. 直接吐出綜合性的散文，無法追溯來源
+2. 一篇一篇讀 paper 但沒有跨 paper 的整合
 
-The architecture is documented in `讀Paper的PipeLine.drawio` (open in [draw.io](https://app.diagrams.net/)).
+本 pipeline 把職責拆成四個 agent，每個只負責一件事，agent 之間只透過檔案系統溝通。每個中間狀態都可觀察（直接看檔案就行），每一步都可重啟，Grad Student 與 Professor 之間的退件迴圈模擬真實的學術同儕審查。
 
-## Architecture
+## 架構圖
+
+![Pipeline 架構](讀Paper的PipeLine.drawio.png)
+
+> 若上圖未顯示「**助教Agent (TA)**」lane，代表 PNG 尚未更新到最新版。請開 [draw.io](https://app.diagrams.net/) 載入 `讀Paper的PipeLine.drawio`，File → Export As → PNG 重新匯出覆蓋既有檔。
+
+## 流程文字版
 
 ```
 [User] → Requirement.md
     ↓
-[Paper Finder Agent] → searches arXiv + Semantic Scholar (+ Google Scholar via Scrapling)
-    ↓                   scores candidates, downloads top N PDFs
+[Paper Finder Agent] → 從 arXiv + Semantic Scholar (+ 可選 Google Scholar) 搜尋
+    ↓                   評分並下載前 N 篇 PDF
 papers/_inbox/
-    ↓ (orchestrator moves to _reading)
-[Grad Student Agent] (Phase 1, per paper, fresh session each)
-    ↓                   reads PDF using IMRD order, extracts structured key points
+    ↓ (orchestrator 把 PDF 搬到 _reading)
+[Grad Student Agent] (Phase 1，每篇 paper 一個全新 session)
+    ↓                   按 IMRD 順序讀 PDF，抽取結構化 key points
 key_points/paper_*.md
     ↓
-[TA Agent] (per paper, fresh session each)
-    ↓                   rewrites IMRD key points into textbook-style teaching notes
+[TA Agent] (每篇 paper 一個全新 session)
+    ↓                   把 IMRD key points 改寫成 textbook 風格教學文
 paper分析/paper_*_<Method>.md
     ↓
 [Grad Student Agent] (Phase 2)
-    ↓                   compiles all key points into a synthesized summary
+    ↓                   把所有 key points 統整成 summary
 summaries/v1.md
     ↓
 [Professor Agent]
-    ↓                   reviews against rubric; ≥75 → approve, else → revise
-final/summary_final.md       OR    summaries/v1_review.md → back to Phase 2 (v2, v3)
+    ↓                   依 rubric 審查；≥75 通過，否則退件
+final/summary_final.md       OR    summaries/v1_review.md → 退回 Phase 2 (v2, v3)
 ```
 
-Each agent invocation is a **fresh Claude Code subprocess** (no session history). Inter-agent state lives only in files. The orchestrator (`run.py`) handles flow control, file moves, and revision loop logic.
+每次 agent 呼叫都是**全新的 Claude Code 子程序**（沒有 session history）。Agent 之間的 state 只透過檔案傳遞。Orchestrator (`run.py`) 負責流程控制、檔案搬移、退件迴圈邏輯。
 
-## Setup
+## 環境需求
 
-Requires Python 3.10+, [Claude Code CLI](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview) installed and authenticated, and an Anthropic subscription (the agents run through Claude Code, no API key needed in your environment).
+- Python 3.10+
+- [Claude Code CLI](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview)（裝好且登入）
+- Anthropic 訂閱（agent 透過 Claude Code 跑，環境內不需要 API key）
+
+## 安裝
 
 ```bash
 git clone https://github.com/TyrannosaurusR/Paper-pipeline.git
-cd paper-pipeline
+cd Paper-pipeline
 python -m venv .venv
 source .venv/bin/activate          # macOS / Linux
 # .venv\Scripts\Activate.ps1       # Windows PowerShell
 pip install -r requirements.txt
 ```
 
-## Usage
+## 使用方式
 
-1. Copy the template to start a new research topic:
+1. 複製 template 建立新題目：
    ```bash
    cp -r projects/_template projects/my-topic
    ```
 
-2. Edit `projects/my-topic/Requirement.md` and fill in the 8 sections (research questions, keywords, scope, exclusions, acceptance criteria).
+2. 編輯 `projects/my-topic/Requirement.md`，填好 8 個欄位（research questions、keywords、scope、exclusions、acceptance criteria 等）。
 
-3. Run the pipeline:
+3. 跑 pipeline：
    ```bash
-   # Smoke test (2 papers, ~30 minutes)
+   # 測試（2 篇 paper，~30 分鐘）
    python run.py my-topic --max-papers 2
 
-   # Full run (10 papers, ~2 hours)
+   # 正式（10 篇 paper，~2 小時）
    python run.py my-topic
    ```
 
-4. Read the output: `projects/my-topic/final/summary_final.md` is the approved review; `projects/my-topic/paper分析/*.md` are per-paper teaching notes.
+4. 讀產出：`projects/my-topic/final/summary_final.md` 是通過審查的 review；`projects/my-topic/paper分析/*.md` 是每篇 paper 的教學文。
 
-### Restart after interruption
+### 中斷後續跑
 
 ```bash
-python run.py my-topic --skip-finder       # skip paper search, reuse existing _inbox/
-python run.py my-topic --resume-from 5     # restart from step 5 (TA stage)
+python run.py my-topic --skip-finder       # 跳過 paper 搜尋，重用既有 _inbox/
+python run.py my-topic --resume-from 5     # 從 step 5 (TA) 開始
 ```
 
-Step numbers: 1=validate, 2=paper finder, 3=move to reading, 4=Grad Student Phase 1, 5=TA, 6=Grad Student Phase 2, 7=Professor.
+Step 對照：1=validate, 2=paper finder, 3=move to reading, 4=Grad Student Phase 1, 5=TA, 6=Grad Student Phase 2, 7=Professor。
 
-## Customization
+## 客製化
 
-- **Agent behavior**: edit the relevant `agents/<name>/agent.md`. Each is a Markdown file with YAML frontmatter (name, model, tools) and a structured body (role, mission, rules, workflow, output format).
-- **Model**: change `MODEL = "claude-sonnet-4-6"` at the top of `run.py`.
-- **Revision limit**: change `MAX_REVISIONS = 2` (max professor rejections before force-approve).
-- **Paper count**: change `MAX_PAPERS = 10` (default cap for Paper Finder).
+- **改 agent 行為**：編輯對應的 `agents/<name>/agent.md`。每個是 YAML frontmatter（name、model、tools）+ 結構化 Markdown body（role、mission、rules、workflow、output format）。
+- **換 model**：改 `run.py` 上方的 `MODEL = "claude-sonnet-4-6"`。
+- **改退件次數上限**：改 `MAX_REVISIONS = 2`（教授最多退件幾次後強制收件）。
+- **改 paper 數量上限**：改 `MAX_PAPERS = 10`（Paper Finder 預設找幾篇）。
 
-## Output format
+## 產出格式
 
-A completed project folder contains:
+完成的題目資料夾結構：
 
 ```
 projects/my-topic/
-├── Requirement.md                user-written research spec
-├── papers/_done/*.pdf            downloaded papers
-├── papers/_inbox/metadata.json   what was found, scores
-├── papers/_rejected/rejected.json   what was filtered out
-├── key_points/paper_*.md         IMRD-format extracts (per paper)
-├── paper分析/paper_*.md          teaching-style analyses (per paper)
-├── summaries/v1.md, v1_review.md, v2.md, ...   synthesis + revision history
-└── final/summary_final.md        approved literature review
+├── Requirement.md                  user 寫的研究需求
+├── papers/_done/*.pdf              已下載的 paper
+├── papers/_inbox/metadata.json     搜尋結果與評分
+├── papers/_rejected/rejected.json  被刷掉的 paper
+├── key_points/paper_*.md           IMRD 格式抽取（每篇 paper 一份）
+├── paper分析/paper_*.md            教學文（每篇 paper 一份）
+├── summaries/v1.md, v1_review.md, v2.md, ...   統整 + 退件迴圈歷史
+└── final/summary_final.md          通過審查的最終版
 ```
 
-The `paper分析/` folder is in Chinese (zh-TW) by default, since the TA agent's prompt specifies a Chinese-language teaching style. To switch languages, edit `agents/ta/agent.md`.
+`paper分析/` 預設用繁體中文寫，因為 TA agent 的 prompt 指定中文教學風格。要換語言改 `agents/ta/agent.md`。
 
-## Costs
+## 成本
 
-Running on a Claude subscription (Pro / Team), a single 10-paper pipeline run takes approximately 2 hours of wall-clock time and counts as several hundred to a few thousand messages against your usage quota. There is no API cost in addition to the subscription.
+跑在 Claude 訂閱（Pro / Team）上，一次 10 篇 paper 的 pipeline 約 2 小時 wall-clock，會佔 quota 數百到數千條 message。**訂閱以外不會有額外的 API 費用**。
 
-## Limitations
+## 限制
 
-- **Single-agent literature reviews only.** No multi-perspective synthesis or contrarian review.
-- **PDF extraction depends on Claude's vision capability**; complex figures and tables may be misread.
-- **Paper Finder uses ad-hoc Python scripts** that the agent generates per run, not a fixed retrieval system. Results vary.
-- **The Professor's rubric is hardcoded in `agents/professor/agent.md`**; modify it if your evaluation criteria differ.
-- **PDFs in `papers/_done/` are not committed** in this public repo. If you fork and want to track research data, modify `.gitignore`.
+- **只支援單 agent 文獻 review**，沒有多角度綜合或對立觀點。
+- **PDF 抽取依賴 Claude 的 vision 能力**，複雜的圖表可能被誤讀。
+- **Paper Finder 用 ad-hoc 的 Python 腳本**（agent 每次跑時自己生）做搜尋，不是固定的 retrieval system，結果會有浮動。
+- **教授的 rubric 寫死在 `agents/professor/agent.md`**，要改評分標準直接改那檔。
+- **`papers/_done/` 的 PDF 在 public repo 不追蹤**。如果你 fork 後想追蹤研究資料，改 `.gitignore`。
 
-## License
+## 授權
 
-MIT. See `LICENSE`.
+MIT，見 `LICENSE`。
 
 ## Contributing
 
-This is a personal project shared for reuse. Issues and PRs welcome but response time is not guaranteed.
+這是個人為了重複利用而 share 的專案。Issue 與 PR 歡迎但回覆時間不保證。
